@@ -1,0 +1,13 @@
+{
+  "ollama_url": "http://172.31.144.1:11434",
+  "model_name": "gemma4:e4b",
+  "camera_sdp_path": "/tmp/stream.sdp",
+  "camera_rtp_port": 5004,
+  "database_path": "data/memory.db",
+  "face_model_path": "models/haarcascade_frontalface_default.xml",
+  "personas_dir": "personas",
+  "ui_window_width": 480,
+  "ui_window_height": 320,
+  "face_detect_interval": 5,
+  "emotion_stable_threshold": 3
+}

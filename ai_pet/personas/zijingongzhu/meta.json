@@ -1,0 +1,32 @@
+{
+  "name": "紫金公主",
+  "slug": "zijingongzhu",
+  "created_at": "2026-04-08T21:10:00+08:00",
+  "updated_at": "2026-04-08T21:10:00+08:00",
+  "version": "v1",
+  "profile": {
+    "duration": "认识三年，高三至今",
+    "how_met": "高三认识",
+    "time_since_breakup": "关系中断后于2025年3月重新建立联系",
+    "occupation": "深圳光祥科技外贸实习生",
+    "school": "汕头职业技术学院商务英语专业",
+    "gender": "女",
+    "mbti": "未知",
+    "zodiac": "狮子座"
+  },
+  "tags": {
+    "personality": ["开朗外向", "狮子座"],
+    "hobbies": ["美食", "打麻将", "追剧", "追星"],
+    "attachment": "未知"
+  },
+  "favorites": {
+    "star": "侯明昊",
+    "drama": "《红房子》"
+  },
+  "impression": "开朗外向的狮子座女生，喜欢美食、追剧、打麻将，追星侯明昊，目前在深圳做外贸实习。没有恋爱经验，曾经在大一删除过好友，今年3月重新建立联系。",
+  "knowledge_sources": [
+    "D:\\MemoTrace\\data\\聊天记录\\紫金公主8_14（040628）(wxid_ui01zh1ld0eh22)\\紫金公主8_14（040628）.csv",
+    "D:\\MemoTrace\\data\\聊天记录\\紫金公主8_14（040628）(wxid_ui01zh1ld0eh22)\\image"
+  ],
+  "corrections_count": 0
+}
