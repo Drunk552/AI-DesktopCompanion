@@ -1,16 +1,16 @@
 #include "vision/face.h"
-#include <iostream>
+#include "logger/logger.h"
 
 FaceDetector::FaceDetector(const std::string& modelPath)
     : modelPath_(modelPath) {}
 
 bool FaceDetector::load() {
     if (!cascade_.load(modelPath_)) {
-        std::cerr << "[FaceDetector] 无法加载模型: " << modelPath_ << std::endl;
+        LOGE("Face", "无法加载模型: " + modelPath_);
         return false;
     }
     loaded_ = true;
-    std::cout << "[FaceDetector] 模型已加载: " << modelPath_ << std::endl;
+    LOGI("Face", "模型已加载: " + modelPath_);
     return true;
 }
 

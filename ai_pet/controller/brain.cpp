@@ -1,10 +1,11 @@
 #include "controller/brain.h"
 #include "ai/personality.h"
-#include <iostream>
+#include "logger/logger.h"
 #include <string>
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <chrono>
 
 Brain::Brain(const std::string& configPath)
     : config_(ConfigManager::instance())
@@ -17,6 +18,35 @@ Brain::Brain(const std::string& configPath)
     , emotionStableThreshold_(config_.get().emotion_stable_threshold)
 {
     config_.load(configPath);
+    LOGI("Brain", "配置已加载");
+}
+
+Brain::~Brain() {
+    cancelAI();
+}
+
+void Brain::cancelAI() {
+    cancelled_.store(true);
+    ai_.cancel();
+}
+
+bool Brain::waitForAI(std::future<std::string>& future, std::string& result, int timeoutMs) {
+    auto status = future.wait_for(std::chrono::milliseconds(timeoutMs));
+    if (status == std::future_status::ready) {
+        try {
+            result = future.get();
+            return true;
+        } catch (const std::exception& e) {
+            LOGE("Brain", "AI 调用异常: " + std::string(e.what()));
+            return false;
+        }
+    } else if (status == std::future_status::timeout) {
+        LOGW("Brain", "AI 调用超时");
+        cancelled_.store(true);
+        ai_.cancel();
+        return false;
+    }
+    return false;
 }
 
 void Brain::setPersonaName(const std::string& name) {
@@ -28,18 +58,18 @@ bool Brain::loadPersona() {
     if (!personaName_.empty()) {
         std::string dir = personasDir + "/" + personaName_;
         if (personaLoader_.load(dir)) {
-            std::cout << "[Brain] 已加载角色: " << personaLoader_.getData().name << std::endl;
+            LOGI("Brain", "已加载角色: " + personaLoader_.getData().name);
             return true;
         } else {
-            std::cerr << "[Brain] 指定角色 '" << personaName_ << "' 加载失败" << std::endl;
+            LOGE("Brain", "指定角色 '" + personaName_ + "' 加载失败");
             return false;
         }
     } else {
         if (personaLoader_.autoLoad(personasDir)) {
-            std::cout << "[Brain] 已加载角色: " << personaLoader_.getData().name << std::endl;
+            LOGI("Brain", "已加载角色: " + personaLoader_.getData().name);
             return true;
         } else {
-            std::cout << "[Brain] 未找到角色文件，使用默认人格" << std::endl;
+            LOGW("Brain", "未找到角色文件，使用默认人格");
             return false;
         }
     }
@@ -51,11 +81,11 @@ const PersonaData* Brain::getPersonaPtr() const {
 
 bool Brain::initVision() {
     if (!faceDetector_.load()) {
-        std::cerr << "[Brain] 人脸检测模型加载失败" << std::endl;
+        LOGE("Brain", "人脸检测模型加载失败");
         return false;
     }
     if (!emotionRecognizer_.load()) {
-        std::cerr << "[Brain] 表情识别模型加载失败" << std::endl;
+        LOGE("Brain", "表情识别模型加载失败");
         return false;
     }
     return true;
@@ -68,25 +98,21 @@ void Brain::runChatMode() {
     std::cout << "=============================" << std::endl;
     std::cout << std::endl;
 
-    // 初始化记忆系统
     if (memory_.open()) {
-        std::cout << "[Brain] 记忆系统已启动" << std::endl;
+        LOGI("Brain", "记忆系统已启动");
     }
 
-    // 加载角色文件
     loadPersona();
 
-    // 显示当前关系状态
     int affinity = memory_.getAffinity();
     AffinityLevel level = getAffinityLevel(affinity);
-    std::cout << "[关系] 好感度: " << affinity << "/100 (" << getAffinityLevelName(level) << ")" << std::endl;
+    LOGI("Brain", "好感度: " + std::to_string(affinity) + "/100 (" + getAffinityLevelName(level) + ")");
 
     std::string input;
     while (true) {
         std::cout << "[" << getAffinityLevelName(getAffinityLevel(memory_.getAffinity())) << " " << memory_.getAffinity() << "] 你: ";
         std::getline(std::cin, input);
 
-        // 退出条件
         if (input == "quit" || input == "exit" || input.empty()) {
             if (input == "quit" || input == "exit") {
                 std::cout << "……再见。" << std::endl;
@@ -95,25 +121,28 @@ void Brain::runChatMode() {
             continue;
         }
 
-        // 获取关系数据
+        cancelled_.store(false);
         int aff = memory_.getAffinity();
         std::string emotionTrend = memory_.getEmotionTrend();
         std::string context = memory_.getContext(5);
 
-        // 构造 prompt（融合人格进化 + 情绪策略）
         std::string prompt = buildPrompt(input, currentEmotion_, context, aff, emotionTrend, getPersonaPtr());
 
-        // 调用 AI
         std::cout << "（思考中...）" << std::endl;
-        std::string reply = ai_.chat(prompt);
-
-        if (reply.empty()) {
-            std::cout << "TA: ……（沉默）" << std::endl;
+        
+        auto future = ai_.chatAsync(prompt);
+        std::string reply;
+        
+        if (waitForAI(future, reply)) {
+            if (reply.empty()) {
+                std::cout << "TA: ……（沉默）" << std::endl;
+            } else {
+                std::cout << "TA: " << reply << std::endl;
+            }
         } else {
-            std::cout << "TA: " << reply << std::endl;
+            std::cout << "TA: ……（网络有点问题，再试一次？）" << std::endl;
         }
 
-        // 保存对话 + 更新关系
         memory_.saveChat(input, reply.empty() ? "……" : reply, currentEmotion_);
         memory_.recordEmotion(currentEmotion_);
         memory_.incrementChatCount();
@@ -125,35 +154,31 @@ void Brain::runChatMode() {
 }
 
 void Brain::runCameraMode() {
-    std::cout << "[Brain] 启动摄像头测试模式..." << std::endl;
+    LOGI("Brain", "启动摄像头测试模式");
 
     if (!initVision()) {
-        std::cerr << "[Brain] 视觉模块初始化失败" << std::endl;
+        LOGE("Brain", "视觉模块初始化失败");
         return;
     }
 
     if (!camera_.open()) {
-        std::cerr << "[Brain] 无法打开摄像头，请检查 /tmp/yuyv.sdp 是否存在" << std::endl;
+        LOGE("Brain", "无法打开摄像头，请检查 /tmp/yuyv.sdp 是否存在");
         return;
     }
 
-    std::cout << "[Brain] 摄像头已打开，按 'q' 退出" << std::endl;
+    LOGI("Brain", "摄像头已打开，按 'q' 退出");
 
     cv::Mat frame;
     while (true) {
         if (camera_.getFrame(frame)) {
-            // 人脸检测
             auto faces = faceDetector_.detect(frame);
 
             for (const auto& face : faces) {
-                // 绘制人脸框
                 cv::rectangle(frame, face, cv::Scalar(0, 255, 0), 2);
 
-                // 表情识别
                 cv::Mat faceROI = frame(face);
                 std::string emotion = emotionRecognizer_.recognize(faceROI);
 
-                // 显示情绪标签
                 cv::putText(frame, emotion, cv::Point(face.x, face.y - 10),
                             cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
 
@@ -180,7 +205,6 @@ void Brain::runFullMode() {
     std::cout << "=============================" << std::endl;
     std::cout << std::endl;
 
-    // 初始化视觉模块
     bool visionReady = initVision();
     bool cameraReady = false;
     if (visionReady) {
@@ -188,25 +212,22 @@ void Brain::runFullMode() {
     }
 
     if (!cameraReady) {
-        std::cout << "[Brain] 摄像头未就绪，将在纯对话模式下运行（无表情识别）" << std::endl;
+        LOGW("Brain", "摄像头未就绪，将在纯对话模式下运行");
     }
 
-    // 初始化记忆系统
     if (memory_.open()) {
-        std::cout << "[Brain] 记忆系统已启动" << std::endl;
+        LOGI("Brain", "记忆系统已启动");
     }
 
-    // 加载角色文件
     loadPersona();
 
     std::atomic<bool> running{true};
-    std::mutex emotionMutex;
 
     std::thread chatThread([&]() {
         std::string input;
         while (running) {
             {
-                std::lock_guard<std::mutex> lock(emotionMutex);
+                std::lock_guard<std::mutex> lock(emotionMutex_);
                 std::cout << "[当前情绪: " << currentEmotion_ << "] ";
             }
             std::cout << "你: " << std::flush;
@@ -221,9 +242,11 @@ void Brain::runFullMode() {
             }
             if (input.empty()) continue;
 
+            cancelled_.store(false);
+
             std::string emotion;
             {
-                std::lock_guard<std::mutex> lock(emotionMutex);
+                std::lock_guard<std::mutex> lock(emotionMutex_);
                 emotion = currentEmotion_;
             }
 
@@ -233,12 +256,18 @@ void Brain::runFullMode() {
             std::string prompt = buildPrompt(input, emotion, context, aff, emotionTrend, getPersonaPtr());
 
             std::cout << "（思考中...）" << std::endl;
-            std::string reply = ai_.chat(prompt);
 
-            if (reply.empty()) {
-                std::cout << "TA: ……（沉默）" << std::endl;
+            auto future = ai_.chatAsync(prompt);
+            std::string reply;
+            
+            if (waitForAI(future, reply)) {
+                if (reply.empty()) {
+                    std::cout << "TA: ……（沉默）" << std::endl;
+                } else {
+                    std::cout << "TA: " << reply << std::endl;
+                }
             } else {
-                std::cout << "TA: " << reply << std::endl;
+                std::cout << "TA: ……（网络有点问题）" << std::endl;
             }
 
             memory_.saveChat(input, reply.empty() ? "……" : reply, emotion);
@@ -251,20 +280,20 @@ void Brain::runFullMode() {
     });
 
     if (cameraReady) {
-        std::cout << "[Brain] 摄像头已启动，等待第一帧..." << std::endl;
+        LOGI("Brain", "摄像头已启动，等待第一帧...");
         cv::Mat frame;
         int frameCount = 0;
         int emptyCount = 0;
         while (running && emptyCount < 300) {
             if (camera_.getFrame(frame)) {
-                std::cout << "[Brain] 收到第一帧，摄像头正常" << std::endl;
+                LOGI("Brain", "收到第一帧，摄像头正常");
                 break;
             }
             emptyCount++;
             cv::waitKey(10);
         }
         if (emptyCount >= 300) {
-            std::cout << "[Brain] 摄像头超时无数据，继续尝试..." << std::endl;
+            LOGW("Brain", "摄像头超时无数据，继续尝试...");
         }
 
         while (running) {
@@ -278,7 +307,7 @@ void Brain::runFullMode() {
                         cv::putText(frame, emotion, cv::Point(face.x, face.y - 10),
                                     cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
                         {
-                            std::lock_guard<std::mutex> lock(emotionMutex);
+                            std::lock_guard<std::mutex> lock(emotionMutex_);
                             currentEmotion_ = emotion;
                         }
                     }
@@ -294,13 +323,13 @@ void Brain::runFullMode() {
         }
         cv::destroyAllWindows();
     } else {
-        // 无摄像头时，主线程等待对话线程结束
         chatThread.join();
         camera_.close();
         return;
     }
 
     running = false;
+    cancelAI();
     if (chatThread.joinable()) {
         chatThread.join();
     }
@@ -308,54 +337,54 @@ void Brain::runFullMode() {
 }
 
 void Brain::runUIMode() {
-    std::cout << "[Brain] 启动 UI 模式..." << std::endl;
+    LOGI("Brain", "启动 UI 模式");
 
     const auto& cfg = config_.get();
     if (!ui_.init(cfg.ui_window_width, cfg.ui_window_height)) {
-        std::cerr << "[Brain] UI 初始化失败" << std::endl;
+        LOGE("Brain", "UI 初始化失败");
         return;
     }
 
-    // 初始化视觉模块
     bool visionReady = initVision();
     bool cameraReady = false;
     if (visionReady) {
         cameraReady = camera_.open();
     }
     if (!cameraReady) {
-        std::cout << "[Brain] 摄像头未就绪，UI 将在无摄像头模式下运行" << std::endl;
+        LOGW("Brain", "摄像头未就绪，UI 将在无摄像头模式下运行");
     }
 
-    // 初始化记忆系统
     if (memory_.open()) {
-        std::cout << "[Brain] 记忆系统已启动" << std::endl;
+        LOGI("Brain", "记忆系统已启动");
     }
 
-    // 加载角色文件
     loadPersona();
 
     std::atomic<bool> running{true};
-    std::mutex emotionMutex;
 
-    // 设置发送回调：用户点击发送或按回车时触发
-    ui_.setSendCallback([this, &running, &emotionMutex](const std::string& input) {
+    ui_.setSendCallback([this, &running](const std::string& input) {
         if (input == "quit" || input == "exit") {
             running = false;
+            cancelAI();
             return;
         }
 
-        std::cout << "[Brain] 收到用户输入: " << input << std::endl;
+        if (aiRunning_.load()) {
+            LOGW("Brain", "AI 正在处理中，请稍候");
+            return;
+        }
 
-        // 显示用户消息
+        LOGD("Brain", "收到用户输入: " + input);
+
+        cancelled_.store(false);
         ui_.addChatMessage(input, true);
         ui_.setThinking(true);
 
-        // 在后台线程调用 AI（避免阻塞 UI）
-        std::thread([this, &running, &emotionMutex, input]() {
+        std::thread([this, input]() {
             try {
                 std::string emotion;
                 {
-                    std::lock_guard<std::mutex> lock(emotionMutex);
+                    std::lock_guard<std::mutex> lock(emotionMutex_);
                     emotion = currentEmotion_;
                 }
 
@@ -363,50 +392,58 @@ void Brain::runUIMode() {
                 std::string emotionTrend = memory_.getEmotionTrend();
                 std::string context = memory_.getContext(5);
                 
-                std::cout << "[Brain] 构建 prompt (persona: " << (getPersonaPtr() ? "是" : "否") << ")..." << std::endl;
+                LOGD("Brain", "构建 prompt (persona: " + std::string(getPersonaPtr() ? "是" : "否") + ")");
                 std::string prompt = buildPrompt(input, emotion, context, aff, emotionTrend, getPersonaPtr());
                 
-                std::cout << "[Brain] 调用 AI..." << std::endl;
-                std::string reply = ai_.chat(prompt);
-
-                std::cout << "[Brain] AI 回复长度: " << reply.size() << " 字节" << std::endl;
-
-                if (reply.empty()) {
-                    std::cout << "[Brain] AI 返回空回复，使用默认回复" << std::endl;
-                    reply = "......";
-                }
-
-                // 更新 UI
-                ui_.setThinking(false);
-                ui_.addChatMessage(reply, false);
-
-                // 保存记忆 + 更新关系
-                memory_.saveChat(input, reply, emotion);
-                memory_.recordEmotion(emotion);
-                memory_.incrementChatCount();
-                int delta = calculateAffinityDelta(emotion, input);
-                memory_.updateAffinity(delta);
-
-                // 更新 UI 情绪显示
-                ui_.updateEmotion(emotion);
+                LOGD("Brain", "启动异步 AI 调用...");
+                aiRunning_.store(true);
                 
-                std::cout << "[Brain] 消息处理完成" << std::endl;
+                auto future = ai_.chatAsync(prompt);
+                std::string reply;
+                
+                if (waitForAI(future, reply, 180000)) {
+                    LOGD("Brain", "AI 回复长度: " + std::to_string(reply.size()) + " 字节");
+
+                    if (reply.empty()) {
+                        LOGW("Brain", "AI 返回空回复");
+                        reply = "……";
+                    }
+
+                    ui_.setThinking(false);
+                    ui_.addChatMessage(reply, false);
+
+                    memory_.saveChat(input, reply, emotion);
+                    memory_.recordEmotion(emotion);
+                    memory_.incrementChatCount();
+                    int delta = calculateAffinityDelta(emotion, input);
+                    memory_.updateAffinity(delta);
+
+                    ui_.updateEmotion(emotion);
+                    
+                    LOGD("Brain", "消息处理完成");
+                } else {
+                    ui_.setThinking(false);
+                    ui_.addChatMessage("……抱歉，网络好像有点问题", false);
+                }
+                
+                aiRunning_.store(false);
             } catch (const std::exception& e) {
-                std::cerr << "[Brain] 处理消息异常: " << e.what() << std::endl;
+                LOGE("Brain", "处理消息异常: " + std::string(e.what()));
                 ui_.setThinking(false);
+                aiRunning_.store(false);
                 ui_.addChatMessage("系统错误: " + std::string(e.what()), false);
             } catch (...) {
-                std::cerr << "[Brain] 处理消息发生未知异常" << std::endl;
+                LOGE("Brain", "处理消息发生未知异常");
                 ui_.setThinking(false);
+                aiRunning_.store(false);
                 ui_.addChatMessage("系统错误", false);
             }
         }).detach();
     });
 
-    // 后台线程：摄像头读取 + 人脸检测 + 表情识别
     std::thread visionThread;
     if (cameraReady) {
-        visionThread = std::thread([&]() {
+        visionThread = std::thread([this, &running]() {
             cv::Mat frame;
             int frameCount = 0;
             while (running) {
@@ -420,7 +457,7 @@ void Brain::runUIMode() {
                             cv::putText(frame, emotion, cv::Point(face.x, face.y - 10),
                                         cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 0), 2);
                             {
-                                std::lock_guard<std::mutex> lock(emotionMutex);
+                                std::lock_guard<std::mutex> lock(emotionMutex_);
                                 currentEmotion_ = emotion;
                             }
                             ui_.updateEmotion(emotion);
@@ -432,10 +469,9 @@ void Brain::runUIMode() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
         });
-        std::cout << "[Brain] 摄像头后台线程已启动" << std::endl;
+        LOGI("Brain", "摄像头后台线程已启动");
     }
 
-    // 主线程：LVGL + SDL 事件循环
     while (running) {
         if (!ui_.tick()) {
             running = false;
@@ -444,10 +480,11 @@ void Brain::runUIMode() {
     }
 
     running = false;
+    cancelAI();
     if (visionThread.joinable()) {
         visionThread.join();
     }
     camera_.close();
     ui_.shutdown();
-    std::cout << "[Brain] UI 模式已退出" << std::endl;
+    LOGI("Brain", "UI 模式已退出");
 }

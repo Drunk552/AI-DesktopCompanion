@@ -1,13 +1,27 @@
 #include "ui/ui.h"
-#include <iostream>
+#include "ui/assets/pet/white/idle/dog_white_idle.h"
+#include "logger/logger.h"
 #include <cstring>
 #include <fstream>
 #include <vector>
 #include <SDL2/SDL.h>
 
-// ============================================================
-// 初始化与生命周期
-// ============================================================
+#ifndef APP_ASSET_DIR
+#define APP_ASSET_DIR "ui/assets"
+#endif
+
+namespace {
+
+const void* kDogWhiteIdleFrames[] = {
+    &dog_white_idle_0,
+    &dog_white_idle_1,
+    &dog_white_idle_2,
+    &dog_white_idle_3,
+};
+
+constexpr uint32_t kDogWhiteIdleFrameCount = sizeof(kDogWhiteIdleFrames) / sizeof(kDogWhiteIdleFrames[0]);
+
+}
 
 UIManager::~UIManager() {
     shutdown();
@@ -19,30 +33,23 @@ bool UIManager::init(int width, int height) {
     winWidth_ = width;
     winHeight_ = height;
 
-    // 初始化 LVGL
     lv_init();
 
-    // 创建 SDL 显示窗口
     display_ = lv_sdl_window_create(winWidth_, winHeight_);
     if (!display_) {
-        std::cerr << "[UI] 无法创建 SDL 窗口" << std::endl;
+        LOGE("UI", "无法创建 SDL 窗口");
         return false;
     }
 
-    // 创建 SDL 鼠标输入设备
     lv_sdl_mouse_create();
 
-    // 创建 SDL 键盘输入设备并绑定输入组
     lv_indev_t* kb = lv_sdl_keyboard_create();
     inputGroup_ = lv_group_create();
     lv_indev_set_group(kb, inputGroup_);
     lv_group_set_default(inputGroup_);
 
-    // 分配摄像头 canvas 缓冲区 (80x60)
-    canvasBuf_ = new uint8_t[camW_ * camH_ * 4];
-    memset(canvasBuf_, 0, camW_ * camH_ * 4);
+    canvasBuf_.resize(camW_ * camH_ * 4, 0);
 
-    // 加载中文字体（Noto Sans CJK SC，TINY_TTF）
     const char* fontPath = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
     std::ifstream fontFile(fontPath, std::ios::binary | std::ios::ate);
     if (fontFile.is_open()) {
@@ -53,19 +60,18 @@ bool UIManager::init(int width, int height) {
         fontFile.close();
         fontCN14_ = lv_tiny_ttf_create_data(fontData_.data(), fontData_.size(), 14);
         fontCN16_ = lv_tiny_ttf_create_data(fontData_.data(), fontData_.size(), 16);
-        std::cout << "[UI] 中文字体已加载 (" << (fileSize / 1024 / 1024) << "MB)" << std::endl;
+        LOGI("UI", "中文字体已加载 (" + std::to_string(fileSize / 1024 / 1024) + "MB)");
     }
     if (!fontCN14_ || !fontCN16_) {
-        std::cerr << "[UI] 警告：无法加载中文字体，回退到默认字体" << std::endl;
+        LOGW("UI", "无法加载中文字体，回退到默认字体");
         fontCN14_ = const_cast<lv_font_t*>(&lv_font_montserrat_14);
         fontCN16_ = const_cast<lv_font_t*>(&lv_font_montserrat_16);
     }
 
-    // 创建 UI 布局
     createLayout();
 
     initialized_ = true;
-    std::cout << "[UI] LVGL + SDL 窗口已创建 (" << winWidth_ << "x" << winHeight_ << ")" << std::endl;
+    LOGI("UI", "LVGL + SDL 窗口已创建 (" + std::to_string(winWidth_) + "x" + std::to_string(winHeight_) + ")");
     return true;
 }
 
@@ -80,12 +86,9 @@ bool UIManager::tick() {
 
 void UIManager::shutdown() {
     if (!initialized_) return;
-    if (canvasBuf_) {
-        delete[] canvasBuf_;
-        canvasBuf_ = nullptr;
-    }
+    canvasBuf_.clear();
     initialized_ = false;
-    std::cout << "[UI] 窗口已关闭" << std::endl;
+    LOGI("UI", "窗口已关闭");
 }
 
 // ============================================================
@@ -129,12 +132,20 @@ void UIManager::createLeftPanel(lv_obj_t* parent) {
     lv_obj_set_style_pad_all(leftPanel_, 0, 0);
     lv_obj_clear_flag(leftPanel_, LV_OBJ_FLAG_SCROLLABLE);
 
-    // 宠物形象占位标签（居中）
-    petImage_ = lv_label_create(leftPanel_);
-    lv_label_set_text(petImage_, "(·ω·)");
-    lv_obj_set_style_text_color(petImage_, lv_color_hex(0x89B4FA), 0);
-    lv_obj_set_style_text_font(petImage_, &lv_font_montserrat_20, 0);
+    // 左侧默认背景图（最底层）
+    lv_obj_t* leftBgImage = lv_image_create(leftPanel_);
+    lv_image_set_src(leftBgImage, "/" APP_ASSET_DIR "/backgrounds/left/default.png");
+    lv_obj_set_size(leftBgImage, panelW, winHeight_);
+    lv_obj_set_pos(leftBgImage, 0, 0);
+    lv_obj_move_to_index(leftBgImage, 0);
+
+    // 宠物待机动画（居中）
+    petImage_ = lv_animimg_create(leftPanel_);
+    lv_animimg_set_src(petImage_, kDogWhiteIdleFrames, kDogWhiteIdleFrameCount);
+    lv_animimg_set_duration(petImage_, 800);
+    lv_animimg_set_repeat_count(petImage_, LV_ANIM_REPEAT_INFINITE);
     lv_obj_center(petImage_);
+    lv_animimg_start(petImage_);
 
     // 宠物名字标签（底部）
     lv_obj_t* nameLabel = lv_label_create(leftPanel_);
@@ -145,7 +156,7 @@ void UIManager::createLeftPanel(lv_obj_t* parent) {
 
     // 悬浮摄像头画中画（右上角，绝对定位）
     cameraCanvas_ = lv_canvas_create(leftPanel_);
-    lv_canvas_set_buffer(cameraCanvas_, canvasBuf_, camW_, camH_, LV_COLOR_FORMAT_ARGB8888);
+    lv_canvas_set_buffer(cameraCanvas_, canvasBuf_.data(), camW_, camH_, LV_COLOR_FORMAT_ARGB8888);
     lv_obj_set_style_radius(cameraCanvas_, 12, 0);
     lv_obj_set_style_clip_corner(cameraCanvas_, true, 0);
     lv_obj_set_style_shadow_width(cameraCanvas_, 12, 0);
@@ -166,6 +177,7 @@ void UIManager::createRightPanel(lv_obj_t* parent) {
     rightPanel_ = lv_obj_create(parent);
     lv_obj_set_size(rightPanel_, panelW, winHeight_);
     lv_obj_set_style_bg_color(rightPanel_, lv_color_hex(0x1E1E1E), 0);
+    lv_obj_set_style_bg_opa(rightPanel_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(rightPanel_, 0, 0);
     lv_obj_set_style_radius(rightPanel_, 0, 0);
     lv_obj_set_style_pad_all(rightPanel_, 0, 0);
@@ -173,10 +185,19 @@ void UIManager::createRightPanel(lv_obj_t* parent) {
     lv_obj_set_flex_flow(rightPanel_, LV_FLEX_FLOW_COLUMN);
     lv_obj_clear_flag(rightPanel_, LV_OBJ_FLAG_SCROLLABLE);
 
+    // 右侧默认背景图（最底层，不参与 Flex 布局）
+    lv_obj_t* rightBgImage = lv_image_create(rightPanel_);
+    lv_image_set_src(rightBgImage, "/" APP_ASSET_DIR "/backgrounds/right/default.png");
+    lv_obj_set_size(rightBgImage, panelW, winHeight_);
+    lv_obj_set_pos(rightBgImage, 0, 0);
+    lv_obj_add_flag(rightBgImage, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_move_to_index(rightBgImage, 0);
+
     // ===== 3.2.1 顶部状态栏 (top_bar) =====
     lv_obj_t* topBar = lv_obj_create(rightPanel_);
     lv_obj_set_size(topBar, panelW, 32);
     lv_obj_set_style_bg_color(topBar, lv_color_hex(0x181818), 0);
+    lv_obj_set_style_bg_opa(topBar, LV_OPA_80, 0);
     lv_obj_set_style_border_width(topBar, 0, 0);
     lv_obj_set_style_border_side(topBar, LV_BORDER_SIDE_BOTTOM, 0);
     lv_obj_set_style_border_color(topBar, lv_color_hex(0x2A2A2A), 0);
@@ -217,7 +238,8 @@ void UIManager::createRightPanel(lv_obj_t* parent) {
     chatPanel_ = lv_obj_create(rightPanel_);
     lv_obj_set_width(chatPanel_, panelW);
     lv_obj_set_flex_grow(chatPanel_, 1);
-    lv_obj_set_style_bg_color(chatPanel_, lv_color_hex(0x1E1E1E), 0);
+    lv_obj_set_style_bg_color(chatPanel_, lv_color_hex(0x101014), 0);
+    lv_obj_set_style_bg_opa(chatPanel_, LV_OPA_30, 0);
     lv_obj_set_style_border_width(chatPanel_, 0, 0);
     lv_obj_set_style_radius(chatPanel_, 0, 0);
     lv_obj_set_style_pad_left(chatPanel_, 8, 0);
@@ -241,6 +263,7 @@ void UIManager::createRightPanel(lv_obj_t* parent) {
     lv_obj_t* bottomBar = lv_obj_create(rightPanel_);
     lv_obj_set_size(bottomBar, panelW, 40);
     lv_obj_set_style_bg_color(bottomBar, lv_color_hex(0x181818), 0);
+    lv_obj_set_style_bg_opa(bottomBar, LV_OPA_90, 0);
     lv_obj_set_style_border_width(bottomBar, 0, 0);
     lv_obj_set_style_border_side(bottomBar, LV_BORDER_SIDE_TOP, 0);
     lv_obj_set_style_border_color(bottomBar, lv_color_hex(0x2A2A2A), 0);
@@ -261,6 +284,7 @@ void UIManager::createRightPanel(lv_obj_t* parent) {
     lv_textarea_set_placeholder_text(inputArea_, "输入消息...");
     lv_textarea_set_one_line(inputArea_, true);
     lv_obj_set_style_bg_color(inputArea_, lv_color_hex(0x2A2A2A), 0);
+    lv_obj_set_style_bg_opa(inputArea_, LV_OPA_90, 0);
     lv_obj_set_style_text_color(inputArea_, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_border_width(inputArea_, 0, 0);
     lv_obj_set_style_radius(inputArea_, 15, 0);
@@ -437,13 +461,15 @@ void UIManager::processUpdates() {
             if (msg.isUser) {
                 // 用户消息：靠右，蓝色强调
                 lv_obj_set_style_bg_color(bubble, lv_color_hex(0x2196F3), 0);
+                lv_obj_set_style_bg_opa(bubble, LV_OPA_90, 0);
                 lv_obj_set_style_radius(bubble, 12, 0);
                 // 右下角小圆角模拟气泡尾巴
                 lv_obj_set_style_radius(bubble, 12, 0);
                 lv_obj_set_align(bubble, LV_ALIGN_RIGHT_MID);
             } else {
                 // AI 消息：靠左，深灰
-                lv_obj_set_style_bg_color(bubble, lv_color_hex(0x333333), 0);
+                lv_obj_set_style_bg_color(bubble, lv_color_hex(0x23242B), 0);
+                lv_obj_set_style_bg_opa(bubble, LV_OPA_80, 0);
                 lv_obj_set_style_radius(bubble, 12, 0);
             }
 
@@ -490,7 +516,7 @@ void UIManager::renderCameraFrame() {
     cv::cvtColor(resized, bgra, cv::COLOR_BGR2BGRA);
 
     // 复制到 canvas 缓冲区
-    memcpy(canvasBuf_, bgra.data, camW_ * camH_ * 4);
+    memcpy(canvasBuf_.data(), bgra.data, camW_ * camH_ * 4);
 
     // 通知 LVGL 更新
     lv_obj_invalidate(cameraCanvas_);

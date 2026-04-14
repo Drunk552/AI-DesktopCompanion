@@ -10,6 +10,31 @@ lib/
 .vscode/
 .qoder/
 
+# 忽略日志文件
+logs/
+
+# 忽略临时文件
+*.tmp
+*.log
+
+# 忽略编译生成的二进制文件
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 忽略 CMake 生成的构建文件
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile    
+
+#
+.cache/
+
+# 忽略 Clang-Format 配置文件
+.clang-format
+
 # 忽略 CMake 临时文件
 CMakeCache.txt
 CMakeFiles/

@@ -47,6 +47,7 @@ include_directories(
 set(SOURCES
     main.cpp
     config/config.cpp
+    logger/logger.cpp
     vision/camera.cpp
     vision/face.cpp
     vision/emotion.cpp
@@ -60,8 +61,19 @@ set(SOURCES
     ui/ui.cpp
 )
 
+# 自动收集 UI 资源源码（如 LVGL 图片转换生成的 .c 文件）
+file(GLOB_RECURSE UI_ASSET_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/ui/assets/*.c
+)
+
+list(APPEND SOURCES ${UI_ASSET_SOURCES})
+
 # ===== 可执行文件 =====
 add_executable(${PROJECT_NAME} ${SOURCES})
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    APP_ASSET_DIR="${CMAKE_SOURCE_DIR}/ui/assets"
+)
 
 # ===== 链接库 =====
 target_link_libraries(${PROJECT_NAME}

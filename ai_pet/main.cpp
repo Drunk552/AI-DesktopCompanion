@@ -1,3 +1,22 @@
+/**
+ * @file main.cpp
+ * @brief AI 桌面宠物主程序入口
+ * 
+ * 支持多种运行模式：
+ * - UI 模式：LVGL 图形界面
+ * - 对话模式：终端纯文字交互
+ * - 摄像头模式：测试摄像头和人脸检测
+ * - 完整模式：终端+摄像头
+ * 
+ * @example
+ * ./ai_pet                  // 默认 UI 模式
+ * ./ai_pet --chat           // 终端对话模式
+ * ./ai_pet --camera         // 摄像头测试
+ * ./ai_pet --full           // 完整模式
+ * ./ai_pet --persona xiao   // 指定角色
+ * ./ai_pet --config my.json  // 指定配置
+ */
+
 #include "controller/brain.h"
 #include "ai/persona_loader.h"
 #include "config/config.h"
@@ -5,6 +24,10 @@
 #include <string>
 #include <cstring>
 
+/**
+ * @brief 打印程序使用帮助
+ * @param prog 程序名称
+ */
 void printUsage(const char* prog) {
     std::cout << "用法: " << prog << " [选项]" << std::endl;
     std::cout << "  --ui              UI 模式 - LVGL 窗口（默认）" << std::endl;
@@ -17,11 +40,17 @@ void printUsage(const char* prog) {
     std::cout << "  --help            显示帮助" << std::endl;
 }
 
+/**
+ * @brief 主函数
+ * @param argc 命令行参数个数
+ * @param argv 命令行参数数组
+ * @return int 退出码
+ */
 int main(int argc, char* argv[]) {
-    std::string mode = "ui";
-    std::string personaName;
-    std::string configPath = "config.json";
-
+    std::string mode = "ui";      ///< 运行模式
+    std::string personaName;      ///< 指定的角色名称
+    std::string configPath = "config.json";  ///< 配置文件路径
+    
     for (int i = 1; i < argc; i++) {
         if (std::strcmp(argv[i], "--ui") == 0) {
             mode = "ui";
@@ -65,15 +94,14 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
-
+    
     ConfigManager::instance().load(configPath);
     Brain brain(configPath);
-
-    // 设置角色名称（空字符串=自动检测）
+    
     if (!personaName.empty()) {
         brain.setPersonaName(personaName);
     }
-
+    
     if (mode == "ui") {
         brain.runUIMode();
     } else if (mode == "chat") {
@@ -83,6 +111,6 @@ int main(int argc, char* argv[]) {
     } else if (mode == "full") {
         brain.runFullMode();
     }
-
+    
     return 0;
 }

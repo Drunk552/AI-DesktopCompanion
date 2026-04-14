@@ -1,5 +1,5 @@
 #include "ai/persona_loader.h"
-#include <iostream>
+#include "logger/logger.h"
 #include <fstream>
 #include <sstream>
 #include <filesystem>
@@ -24,32 +24,29 @@ std::string PersonaLoader::parseNameFromMeta(const std::string& metaJson) {
             return j["name"].get<std::string>();
         }
     } catch (const nlohmann::json::exception& e) {
-        std::cerr << "[PersonaLoader] meta.json 解析失败: " << e.what() << std::endl;
+        LOGE("Persona", "meta.json 解析失败: " + std::string(e.what()));
     }
     return "";
 }
 
 bool PersonaLoader::load(const std::string& personaDir) {
-    // persona.md 是必须的
     std::string personaPath = personaDir + "/persona.md";
     if (!fs::exists(personaPath)) {
-        std::cerr << "[PersonaLoader] 未找到 persona.md: " << personaPath << std::endl;
+        LOGE("Persona", "未找到 persona.md: " + personaPath);
         return false;
     }
 
     data_.personaContent = readFile(personaPath);
     if (data_.personaContent.empty()) {
-        std::cerr << "[PersonaLoader] persona.md 为空: " << personaPath << std::endl;
+        LOGE("Persona", "persona.md 为空: " + personaPath);
         return false;
     }
 
-    // memories.md 可选
     std::string memoriesPath = personaDir + "/memories.md";
     if (fs::exists(memoriesPath)) {
         data_.memoriesContent = readFile(memoriesPath);
     }
 
-    // meta.json 可选，用于提取昵称
     std::string metaPath = personaDir + "/meta.json";
     if (fs::exists(metaPath)) {
         std::string metaContent = readFile(metaPath);
@@ -58,15 +55,14 @@ bool PersonaLoader::load(const std::string& personaDir) {
         }
     }
 
-    // 如果 meta.json 没有提供名字，用目录名作为角色名
     if (data_.name.empty()) {
         data_.name = fs::path(personaDir).filename().string();
     }
 
     data_.loaded = true;
-    std::cout << "[PersonaLoader] 角色已加载: " << data_.name
-              << " (persona: " << data_.personaContent.size() << " bytes"
-              << ", memories: " << data_.memoriesContent.size() << " bytes)" << std::endl;
+    LOGI("Persona", "角色已加载: " + data_.name +
+         " (persona: " + std::to_string(data_.personaContent.size()) + " bytes" +
+         ", memories: " + std::to_string(data_.memoriesContent.size()) + " bytes)");
     return true;
 }
 

@@ -1,10 +1,60 @@
+/**
+ * @file vision/emotion.cpp
+ * @brief 表情识别模块实现
+ * 
+ * 优先使用 FERPlus ONNX 模型进行表情识别。
+ * 如果模型加载失败，自动回退到几何特征分析方法。
+ */
+
 #include "vision/emotion.h"
-#include <iostream>
+#include "logger/logger.h"
+
+/// FERPlus 模型的 8 种情绪标签顺序
+const std::vector<std::string> EmotionRecognizer::FERPLUS_LABELS = {
+    "neutral",    // 0
+    "happiness",  // 1
+    "surprise",   // 2
+    "sadness",    // 3
+    "anger",      // 4
+    "disgust",    // 5
+    "fear",       // 6
+    "contempt"    // 7
+};
+
+EmotionRecognizer::EmotionRecognizer(const std::string& modelPath)
+    : modelPath_(modelPath) {}
 
 bool EmotionRecognizer::load() {
+    try {
+        net_ = cv::dnn::readNet(modelPath_);
+        
+        if (!net_.empty()) {
+            net_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+            loaded_ = true;
+            netUsed_ = true;
+            LOGI("Emotion", "FERPlus ONNX 模型已加载: " + modelPath_);
+            return true;
+        }
+    } catch (const cv::Exception& e) {
+        LOGW("Emotion", "ONNX 模型加载失败: " + std::string(e.what()));
+    }
+    
+    LOGW("Emotion", "回退到几何特征分析方法");
     loaded_ = true;
-    std::cout << "[EmotionRecognizer] 特征分析器已初始化（无需模型文件）" << std::endl;
     return true;
+}
+
+std::string EmotionRecognizer::mapToEmotion(const std::string& ferplusEmotion) {
+    if (ferplusEmotion == "happiness") {
+        return "开心";
+    }
+    if (ferplusEmotion == "sadness" || ferplusEmotion == "fear" || ferplusEmotion == "disgust") {
+        return "难过";
+    }
+    if (ferplusEmotion == "anger" || ferplusEmotion == "contempt") {
+        return "生气";
+    }
+    return "平静";
 }
 
 EmotionRecognizer::FaceFeatures EmotionRecognizer::extractFeatures(const cv::Mat& gray) {
@@ -12,28 +62,19 @@ EmotionRecognizer::FaceFeatures EmotionRecognizer::extractFeatures(const cv::Mat
     int h = gray.rows;
     int w = gray.cols;
 
-    // 将人脸分为上、中、下三个区域
-    // 上部：眉毛区域 (0~30%)
-    // 中部：眼睛区域 (25%~55%)
-    // 下部：嘴巴区域 (60%~100%)
     cv::Mat browRegion = gray(cv::Rect(0, 0, w, h * 3 / 10));
-    cv::Mat eyeRegion  = gray(cv::Rect(0, h / 4, w, h * 3 / 10));
     cv::Mat mouthRegion = gray(cv::Rect(w / 4, h * 6 / 10, w / 2, h * 4 / 10));
 
-    // 嘴巴张开程度：嘴巴区域的标准差（张嘴时变化大）
     cv::Scalar mouthMean, mouthStd;
     cv::meanStdDev(mouthRegion, mouthMean, mouthStd);
     feat.mouthOpenness = mouthStd[0];
 
-    // 眉毛紧张度：眉毛区域的梯度强度
     cv::Mat browGrad;
     cv::Sobel(browRegion, browGrad, CV_64F, 0, 1);
     feat.browTension = cv::mean(cv::abs(browGrad))[0];
 
-    // 整体亮度
     feat.overallBright = cv::mean(gray)[0];
 
-    // 对比度：上半脸和下半脸的亮度差
     cv::Mat upperHalf = gray(cv::Rect(0, 0, w, h / 2));
     cv::Mat lowerHalf = gray(cv::Rect(0, h / 2, w, h / 2));
     feat.contrast = std::abs(cv::mean(upperHalf)[0] - cv::mean(lowerHalf)[0]);
@@ -42,16 +83,12 @@ EmotionRecognizer::FaceFeatures EmotionRecognizer::extractFeatures(const cv::Mat
 }
 
 std::string EmotionRecognizer::classify(const FaceFeatures& feat) {
-    // 基于特征阈值的简单分类规则
-    // 嘴巴张开 + 亮度较高 -> 开心
     if (feat.mouthOpenness > 35.0 && feat.overallBright > 110.0) {
         return "开心";
     }
-    // 眉毛紧缩 + 对比度高 -> 生气
     if (feat.browTension > 30.0 && feat.contrast > 25.0) {
         return "生气";
     }
-    // 亮度低 + 嘴巴区域变化小 -> 难过
     if (feat.overallBright < 100.0 && feat.mouthOpenness < 25.0) {
         return "难过";
     }
@@ -59,9 +96,10 @@ std::string EmotionRecognizer::classify(const FaceFeatures& feat) {
 }
 
 std::string EmotionRecognizer::recognize(const cv::Mat& faceROI) {
-    if (!loaded_ || faceROI.empty()) return "平静";
+    if (faceROI.empty()) {
+        return "平静";
+    }
 
-    // 灰度化
     cv::Mat gray;
     if (faceROI.channels() == 3) {
         cv::cvtColor(faceROI, gray, cv::COLOR_BGR2GRAY);
@@ -69,11 +107,36 @@ std::string EmotionRecognizer::recognize(const cv::Mat& faceROI) {
         gray = faceROI.clone();
     }
 
-    // 统一尺寸
     cv::resize(gray, gray, cv::Size(64, 64));
     cv::equalizeHist(gray, gray);
 
-    // 提取特征并分类
-    FaceFeatures feat = extractFeatures(gray);
-    return classify(feat);
+    if (netUsed_) {
+        try {
+            cv::Mat input = gray.clone();
+            input.convertTo(input, CV_32FC1, 1.0 / 255.0);
+            cv::Mat blob = cv::dnn::blobFromImage(input, 1.0, cv::Size(),
+                                                  cv::Scalar(0), true, false);
+            net_.setInput(blob);
+            cv::Mat output = net_.forward();
+
+            cv::Point maxLoc;
+            double maxVal;
+            cv::minMaxLoc(output, nullptr, &maxVal, nullptr, &maxLoc);
+
+            int emotionIdx = maxLoc.x;
+            if (emotionIdx >= 0 && emotionIdx < static_cast<int>(FERPLUS_LABELS.size())) {
+                return mapToEmotion(FERPLUS_LABELS[emotionIdx]);
+            }
+        } catch (const cv::Exception& e) {
+            LOGW("Emotion", "ONNX 推理失败，使用几何特征: " + std::string(e.what()));
+            netUsed_ = false;
+        }
+    }
+
+    if (!netUsed_) {
+        FaceFeatures feat = extractFeatures(gray);
+        return classify(feat);
+    }
+
+    return "平静";
 }

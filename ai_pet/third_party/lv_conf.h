@@ -127,6 +127,11 @@
 #define LV_USE_FLOAT      0
 
 /*====================
+ * LIBS - IMAGE DECODERS
+ *====================*/
+#define LV_USE_LODEPNG    1
+
+/*====================
  * LIBS - FREETYPE
  *====================*/
 #define LV_USE_FREETYPE 0

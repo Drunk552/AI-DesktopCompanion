@@ -1,5 +1,5 @@
 #include "ai/gemma.h"
-#include <iostream>
+#include "logger/logger.h"
 #include <fstream>
 #include <array>
 #include <cstdio>
@@ -8,7 +8,6 @@
 
 using json = nlohmann::json;
 
-// 自动获取 WSL2 网关 IP（即 Windows 主机 IP）
 static std::string getWindowsHostIP() {
     std::string ip;
     std::array<char, 128> buffer;
@@ -19,7 +18,6 @@ static std::string getWindowsHostIP() {
         }
         pclose(pipe);
     }
-    // 去除末尾换行
     while (!ip.empty() && (ip.back() == '\n' || ip.back() == '\r'))
         ip.pop_back();
     return ip;
@@ -28,18 +26,29 @@ static std::string getWindowsHostIP() {
 GemmaAI::GemmaAI(const std::string& ollamaUrl, const std::string& model)
     : model_(model) {
     if (ollamaUrl.empty()) {
-        // 自动检测 Windows 主机 IP
         std::string hostIP = getWindowsHostIP();
         if (hostIP.empty()) hostIP = "localhost";
         ollamaUrl_ = "http://" + hostIP + ":11434";
-        std::cout << "[GemmaAI] 自动检测 Ollama 地址: " << ollamaUrl_ << std::endl;
+        LOGI("Gemma", "自动检测 Ollama 地址: " + ollamaUrl_);
     } else {
         ollamaUrl_ = ollamaUrl;
     }
 }
 
+GemmaAI::~GemmaAI() {
+    cancel();
+}
+
 void GemmaAI::setModel(const std::string& model) {
     model_ = model;
+}
+
+void GemmaAI::setTimeout(int seconds) {
+    timeoutSeconds_ = seconds;
+}
+
+void GemmaAI::cancel() {
+    cancelled_.store(true);
 }
 
 size_t GemmaAI::writeCallback(char* ptr, size_t size, size_t nmemb, std::string* data) {
@@ -48,13 +57,28 @@ size_t GemmaAI::writeCallback(char* ptr, size_t size, size_t nmemb, std::string*
 }
 
 std::string GemmaAI::chat(const std::string& prompt) {
+    return chatImpl(prompt);
+}
+
+std::future<std::string> GemmaAI::chatAsync(const std::string& prompt) {
+    return std::async(std::launch::async, [this, prompt]() {
+        return chatImpl(prompt);
+    });
+}
+
+std::string GemmaAI::chatImpl(const std::string& prompt) {
+    running_.store(true);
+    cancelled_.store(false);
+    
+    LOGD("Gemma", "开始调用 AI...");
+    
     CURL* curl = curl_easy_init();
     if (!curl) {
-        std::cerr << "[GemmaAI] 无法初始化 CURL" << std::endl;
+        LOGE("Gemma", "无法初始化 CURL");
+        running_.store(false);
         return "";
     }
 
-    // 构造请求 JSON
     json requestBody = {
         {"model", model_},
         {"prompt", prompt},
@@ -62,47 +86,49 @@ std::string GemmaAI::chat(const std::string& prompt) {
     };
     std::string requestStr = requestBody.dump();
 
-    // 设置 URL
     std::string url = ollamaUrl_ + "/api/generate";
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
-    // 设置 POST 数据
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, requestStr.c_str());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, requestStr.size());
 
-    // 设置 Header
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
-    // 设置超时（大模型推理可能较慢）
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, static_cast<long>(timeoutSeconds_));
 
-    // 设置回调
     std::string response;
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
-    // 执行请求
     CURLcode res = curl_easy_perform(curl);
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK) {
-        std::cerr << "[GemmaAI] 请求失败: " << curl_easy_strerror(res) << std::endl;
+    running_.store(false);
+
+    if (cancelled_.load()) {
+        LOGW("Gemma", "请求已被取消");
         return "";
     }
 
-    // 解析响应
+    if (res != CURLE_OK) {
+        LOGE("Gemma", "请求失败: " + std::string(curl_easy_strerror(res)));
+        return "";
+    }
+
     try {
         json respJson = json::parse(response);
         if (respJson.contains("response")) {
-            return respJson["response"].get<std::string>();
+            std::string result = respJson["response"].get<std::string>();
+            LOGD("Gemma", "AI 响应完成，长度: " + std::to_string(result.size()) + " 字符");
+            return result;
         } else if (respJson.contains("error")) {
-            std::cerr << "[GemmaAI] API 错误: " << respJson["error"] << std::endl;
+            LOGE("Gemma", "API 错误: " + respJson["error"].get<std::string>());
         }
     } catch (const json::exception& e) {
-        std::cerr << "[GemmaAI] JSON 解析失败: " << e.what() << std::endl;
+        LOGE("Gemma", "JSON 解析失败: " + std::string(e.what()));
     }
 
     return "";

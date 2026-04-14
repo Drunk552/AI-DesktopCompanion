@@ -1,28 +1,61 @@
+/**
+ * @file vision/camera.h
+ * @brief 摄像头视频流管理模块
+ * 
+ * 负责从 SDP 文件读取 H.264 RTP 视频流，
+ * 支持通过 FFmpeg/SDL 在 Windows 端推流，WSL2 端接收。
+ */
+
 #pragma once
 
 #include <string>
 #include <opencv2/opencv.hpp>
 
+/**
+ * @class Camera
+ * @brief 摄像头视频流读取器
+ * @details 通过 OpenCV 读取 RTP 视频流，支持 H.264 编码格式
+ */
 class Camera {
 public:
-    // sdpPath: SDP 文件路径，默认 /tmp/stream.sdp（H.264 推流）
+    /**
+     * @brief 构造函数
+     * @param sdpPath SDP 文件路径，默认 "/tmp/stream.sdp"
+     */
     explicit Camera(const std::string& sdpPath = "/tmp/stream.sdp");
+    
+    /**
+     * @brief 析构函数，自动关闭视频流
+     */
     ~Camera();
-
-    // 打开视频流
+    
+    /**
+     * @brief 打开视频流
+     * @return bool 打开是否成功
+     * @note 会自动修正 SDP 文件中的端口号
+     */
     bool open();
-
-    // 关闭视频流
+    
+    /**
+     * @brief 关闭视频流
+     */
     void close();
-
-    // 是否已打开
+    
+    /**
+     * @brief 检查视频流是否已打开
+     * @return bool 是否已打开
+     */
     bool isOpened() const;
-
-    // 获取当前帧，成功返回 true
+    
+    /**
+     * @brief 获取当前帧
+     * @param frame 输出参数，接收帧图像
+     * @return bool 是否成功获取帧
+     */
     bool getFrame(cv::Mat& frame);
 
 private:
-    std::string sdpPath_;
-    cv::VideoCapture cap_;
-    int stderrBackup_ = -1;  // stderr 备份，用于关闭时恢复
+    std::string sdpPath_;      ///< SDP 文件路径
+    cv::VideoCapture cap_;     ///< OpenCV 视频捕获对象
+    int stderrBackup_ = -1;   ///< stderr 文件描述符备份
 };
