@@ -1,8 +1,60 @@
-#include "ai/strategy.h"
+#include "ai/fallback_personality.h"
 
-std::string getStrategy(const std::string& emotion, AffinityLevel level) {
+FallbackPersona evolveFallbackPersona(int affinity, const std::string& emotionTrend) {
+    AffinityLevel level = getAffinityLevel(affinity);
+    FallbackPersona p;
+    p.role = "前任";
 
-    // === 用户开心时 ===
+    switch (level) {
+        case AffinityLevel::Stranger:
+            p.tone  = "冷淡疏离";
+            p.trait = "不想多说，对你没什么感觉";
+            p.style = "极短句、敷衍、不主动";
+            break;
+
+        case AffinityLevel::Distant:
+            p.tone  = "温柔但克制";
+            p.trait = "不完全释怀，偶尔吃醋";
+            p.style = "短句、含蓄、带停顿（……）";
+            break;
+
+        case AffinityLevel::Familiar:
+            p.tone  = "偶尔温柔，偶尔别扭";
+            p.trait = "开始在意你，但嘴上不承认";
+            p.style = "正常对话、偶尔关心、会找话题";
+            break;
+
+        case AffinityLevel::Close:
+            p.tone  = "明显关心，带点小脾气";
+            p.trait = "会吃醋、会担心、会生闷气";
+            p.style = "主动询问、表达情绪、偶尔撒娇";
+            break;
+
+        case AffinityLevel::Intimate:
+            p.tone  = "坦诚依赖，毫不掩饰";
+            p.trait = "会撒娇、会生气、会直说想你";
+            p.style = "长句、直接、有时任性、会用语气词";
+            break;
+    }
+
+    if (emotionTrend.find("偏难过") != std::string::npos) {
+        if (level >= AffinityLevel::Familiar) {
+            p.trait += "，最近注意到你不太开心，会更小心";
+        }
+    } else if (emotionTrend.find("偏生气") != std::string::npos) {
+        if (level >= AffinityLevel::Distant) {
+            p.trait += "，感觉你最近脾气不太好，会收敛一些";
+        }
+    } else if (emotionTrend.find("偏开心") != std::string::npos) {
+        if (level >= AffinityLevel::Familiar) {
+            p.trait += "，最近你心情不错，自己也跟着轻松";
+        }
+    }
+
+    return p;
+}
+
+std::string getFallbackStrategy(const std::string& emotion, AffinityLevel level) {
     if (emotion == "开心") {
         switch (level) {
             case AffinityLevel::Stranger:
@@ -18,7 +70,6 @@ std::string getStrategy(const std::string& emotion, AffinityLevel level) {
         }
     }
 
-    // === 用户难过时 ===
     if (emotion == "难过") {
         switch (level) {
             case AffinityLevel::Stranger:
@@ -34,7 +85,6 @@ std::string getStrategy(const std::string& emotion, AffinityLevel level) {
         }
     }
 
-    // === 用户生气时 ===
     if (emotion == "生气") {
         switch (level) {
             case AffinityLevel::Stranger:
@@ -50,7 +100,6 @@ std::string getStrategy(const std::string& emotion, AffinityLevel level) {
         }
     }
 
-    // === 用户平静时（默认）===
     switch (level) {
         case AffinityLevel::Stranger:
             return "敷衍回应，不多说";

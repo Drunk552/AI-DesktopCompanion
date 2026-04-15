@@ -51,13 +51,16 @@ set(SOURCES
     vision/camera.cpp
     vision/face.cpp
     vision/emotion.cpp
+    vision/vision_pipeline.cpp
+    ai/affinity.cpp
     ai/gemma.cpp
     ai/prompt.cpp
-    ai/personality.cpp
-    ai/strategy.cpp
+    ai/fallback_personality.cpp
     ai/persona_loader.cpp
     memory/sqlite.cpp
-    controller/brain.cpp
+    controller/application.cpp
+    controller/module_registry.cpp
+    controller/session.cpp
     ui/ui.cpp
 )
 

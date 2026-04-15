@@ -1,8 +1,6 @@
 #include "ai/prompt.h"
-#include "ai/personality.h"
-#include "ai/strategy.h"
+#include "ai/fallback_personality.h"
 
-// 好感度微调提示（仅 Persona 模式使用）
 static std::string getAffinityHint(int affinity) {
     AffinityLevel level = getAffinityLevel(affinity);
     switch (level) {
@@ -20,57 +18,45 @@ static std::string getAffinityHint(int affinity) {
     return "";
 }
 
-std::string buildPrompt(const std::string& userInput,
-                        const std::string& emotion,
-                        const std::string& context,
-                        int affinity,
-                        const std::string& emotionTrend,
-                        const PersonaData* persona) {
+std::string buildPrompt(const PromptContext& ctx) {
 
-    // === Persona 模式：使用加载的角色文件 ===
-    if (persona != nullptr && persona->loaded) {
-        AffinityLevel level = getAffinityLevel(affinity);
+    if (ctx.persona != nullptr && ctx.persona->loaded) {
+        AffinityLevel level = getAffinityLevel(ctx.affinity);
 
         std::string prompt;
 
-        // persona.md 全文作为系统提示词核心
-        prompt += persona->personaContent + "\n\n";
+        prompt += ctx.persona->personaContent + "\n\n";
 
-        // memories.md 全文作为记忆上下文
-        if (!persona->memoriesContent.empty()) {
+        if (!ctx.persona->memoriesContent.empty()) {
             prompt += "---\n\n";
-            prompt += persona->memoriesContent + "\n\n";
+            prompt += ctx.persona->memoriesContent + "\n\n";
         }
 
         prompt += "---\n\n";
 
-        // 好感度微调提示
-        prompt += "当前与用户的关系好感度：" + std::to_string(affinity) +
+        prompt += "当前与用户的关系好感度：" + std::to_string(ctx.affinity) +
                   "/100（" + getAffinityLevelName(level) + "）\n";
-        prompt += getAffinityHint(affinity) + "\n\n";
+        prompt += getAffinityHint(ctx.affinity) + "\n\n";
 
-        // 注入情绪趋势
-        if (!emotionTrend.empty() && emotionTrend != "无情绪数据") {
-            prompt += "用户" + emotionTrend + "\n\n";
+        if (!ctx.emotionTrend.empty() && ctx.emotionTrend != "无情绪数据") {
+            prompt += "用户" + ctx.emotionTrend + "\n\n";
         }
 
-        // 注入历史上下文
-        if (!context.empty()) {
-            prompt += context + "\n\n";
+        if (!ctx.context.empty()) {
+            prompt += ctx.context + "\n\n";
         }
 
         prompt +=
-            "用户当前情绪：" + emotion + "\n"
-            "用户说：" + userInput + "\n"
+            "用户当前情绪：" + ctx.emotion + "\n"
+            "用户说：" + ctx.userInput + "\n"
             "你：";
 
         return prompt;
     }
 
-    // === 回退模式：原有硬编码人格系统 ===
-    Personality p = evolvePersonality(affinity, emotionTrend);
-    AffinityLevel level = getAffinityLevel(affinity);
-    std::string strategy = getStrategy(emotion, level);
+    FallbackPersona p = evolveFallbackPersona(ctx.affinity, ctx.emotionTrend);
+    AffinityLevel level = getAffinityLevel(ctx.affinity);
+    std::string strategy = getFallbackStrategy(ctx.emotion, level);
 
     std::string prompt =
         "你是用户的" + p.role + "。\n"
@@ -78,7 +64,7 @@ std::string buildPrompt(const std::string& userInput,
         "特点：" + p.trait + "\n\n"
 
         "当前与用户的关系等级：" + getAffinityLevelName(level) +
-        "（好感度 " + std::to_string(affinity) + "/100）\n"
+        "（好感度 " + std::to_string(ctx.affinity) + "/100）\n"
         "当前回应策略：" + strategy + "\n\n"
 
         "表达风格要求：\n"
@@ -89,17 +75,17 @@ std::string buildPrompt(const std::string& userInput,
         "- 不解释太多\n"
         "- 回复控制在 1~3 句话\n\n";
 
-    if (!emotionTrend.empty() && emotionTrend != "无情绪数据") {
-        prompt += "用户" + emotionTrend + "\n";
+    if (!ctx.emotionTrend.empty() && ctx.emotionTrend != "无情绪数据") {
+        prompt += "用户" + ctx.emotionTrend + "\n";
     }
 
-    if (!context.empty()) {
-        prompt += context + "\n";
+    if (!ctx.context.empty()) {
+        prompt += ctx.context + "\n";
     }
 
     prompt +=
-        "用户当前情绪：" + emotion + "\n"
-        "用户说：" + userInput + "\n"
+        "用户当前情绪：" + ctx.emotion + "\n"
+        "用户说：" + ctx.userInput + "\n"
         "你：";
 
     return prompt;

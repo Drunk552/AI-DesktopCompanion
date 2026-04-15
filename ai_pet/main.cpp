@@ -17,7 +17,7 @@
  * ./ai_pet --config my.json  // 指定配置
  */
 
-#include "controller/brain.h"
+#include "controller/application.h"
 #include "ai/persona_loader.h"
 #include "config/config.h"
 #include <iostream>
@@ -47,19 +47,19 @@ void printUsage(const char* prog) {
  * @return int 退出码
  */
 int main(int argc, char* argv[]) {
-    std::string mode = "ui";      ///< 运行模式
+    AppMode mode = AppMode::UI;    ///< 运行模式
     std::string personaName;      ///< 指定的角色名称
     std::string configPath = "config.json";  ///< 配置文件路径
     
     for (int i = 1; i < argc; i++) {
         if (std::strcmp(argv[i], "--ui") == 0) {
-            mode = "ui";
+            mode = AppMode::UI;
         } else if (std::strcmp(argv[i], "--chat") == 0) {
-            mode = "chat";
+            mode = AppMode::Chat;
         } else if (std::strcmp(argv[i], "--camera") == 0) {
-            mode = "camera";
+            mode = AppMode::Camera;
         } else if (std::strcmp(argv[i], "--full") == 0) {
-            mode = "full";
+            mode = AppMode::Full;
         } else if (std::strcmp(argv[i], "--persona") == 0) {
             if (i + 1 < argc) {
                 personaName = argv[++i];
@@ -75,7 +75,8 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
         } else if (std::strcmp(argv[i], "--list-personas") == 0) {
-            auto personas = PersonaLoader::listPersonas("personas");
+            ConfigManager::instance().load(configPath);
+            auto personas = PersonaLoader::listPersonas(ConfigManager::instance().get().personas_dir);
             if (personas.empty()) {
                 std::cout << "未找到可用角色。请将角色文件放到 personas/ 目录下。" << std::endl;
             } else {
@@ -95,22 +96,11 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    ConfigManager::instance().load(configPath);
-    Brain brain(configPath);
+    Application app(configPath);
     
     if (!personaName.empty()) {
-        brain.setPersonaName(personaName);
+        app.setPersonaName(personaName);
     }
-    
-    if (mode == "ui") {
-        brain.runUIMode();
-    } else if (mode == "chat") {
-        brain.runChatMode();
-    } else if (mode == "camera") {
-        brain.runCameraMode();
-    } else if (mode == "full") {
-        brain.runFullMode();
-    }
-    
-    return 0;
+
+    return app.run(mode);
 }
