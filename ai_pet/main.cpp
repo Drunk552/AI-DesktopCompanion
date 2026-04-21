@@ -17,9 +17,9 @@
  * ./ai_pet --config my.json  // 指定配置
  */
 
-#include "controller/application.h"
-#include "ai/persona_loader.h"
-#include "config/config.h"
+#include "app/application.h"
+#include "intelligence/persona/persona_loader.h"
+#include "shared/config/config.h"
 #include <iostream>
 #include <string>
 #include <cstring>

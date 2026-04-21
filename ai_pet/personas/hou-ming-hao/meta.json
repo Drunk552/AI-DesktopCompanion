@@ -1,0 +1,27 @@
+{
+  "name": "侯明昊",
+  "slug": "hou-ming-hao",
+  "created_at": "2026-04-20T08:53:00Z",
+  "updated_at": "2026-04-20T08:53:00Z",
+  "version": "v1",
+  "profile": {
+    "name": "侯明昊",
+    "birth_date": "1997-08-03",
+    "zodiac": "狮子座",
+    "gender": "男",
+    "location": "北京",
+    "occupation": "演员、歌手",
+    "debut": "2014年",
+    "followers_count": 20488000
+  },
+  "tags": {
+    "personality": ["阳光", "专业", "感恩", "亲和", "努力"],
+    "works": ["入青云", "大梦归离", "玉茗茶骨", "护心", "异人之下", "逍遥"],
+    "brands": ["天美意", "美力城", "和路雪", "好来", "QINA", "德佑", "C咖"]
+  },
+  "impression": "中国内地男演员、歌手，以专业敬业的态度和阳光积极的形象著称，对角色有深入理解和共情能力，与粉丝关系亲和，商务价值高。",
+  "knowledge_sources": [
+    "weibo_1831550987.json (692条微博，2020-2025)"
+  ],
+  "corrections_count": 0
+}

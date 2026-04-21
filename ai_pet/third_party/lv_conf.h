@@ -23,7 +23,7 @@
 /*====================
  * HAL SETTINGS
  *====================*/
-#define LV_DEF_REFR_PERIOD  33      /*[ms]*/
+#define LV_DEF_REFR_PERIOD  16      /*[ms]*/
 #define LV_DPI_DEF          130     /*[px/inch]*/
 #define LV_TICK_CUSTOM       1
 
@@ -146,7 +146,7 @@
 #define LV_USE_TINY_TTF 1
 #if LV_USE_TINY_TTF
     #define LV_TINY_TTF_FILE_SUPPORT 1
-    #define LV_TINY_TTF_CACHE_GLYPH_CNT 256
+    #define LV_TINY_TTF_CACHE_GLYPH_CNT 1024
 #endif
 
 /*====================
@@ -165,8 +165,8 @@
 #define LV_USE_SDL              1
 #if LV_USE_SDL
     #define LV_SDL_INCLUDE_PATH     <SDL2/SDL.h>
-    #define LV_SDL_RENDER_MODE      LV_DISPLAY_RENDER_MODE_DIRECT
-    #define LV_SDL_BUF_COUNT        1
+    #define LV_SDL_RENDER_MODE      LV_DISPLAY_RENDER_MODE_FULL
+    #define LV_SDL_BUF_COUNT        2
     #define LV_SDL_ACCELERATED      1
     #define LV_SDL_FULLSCREEN       0
     #define LV_SDL_DIRECT_EXIT      1

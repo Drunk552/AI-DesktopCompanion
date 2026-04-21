@@ -46,21 +46,59 @@ include_directories(
 # ===== 源文件 =====
 set(SOURCES
     main.cpp
-    config/config.cpp
-    logger/logger.cpp
-    vision/camera.cpp
-    vision/face.cpp
-    vision/emotion.cpp
-    vision/vision_pipeline.cpp
-    ai/affinity.cpp
-    ai/gemma.cpp
-    ai/prompt.cpp
-    ai/fallback_personality.cpp
-    ai/persona_loader.cpp
-    memory/sqlite.cpp
-    controller/application.cpp
-    controller/module_registry.cpp
-    controller/session.cpp
+    action/action_coordinator.cpp
+    action/behavior_policy.cpp
+    action/strategy_state_service.cpp
+    action/chat_action_controller.cpp
+    action/pet_action_controller.cpp
+    action/notification_action_controller.cpp
+    shared/config/config.cpp
+    shared/logger/logger.cpp
+    perception/camera.cpp
+    perception/face.cpp
+    perception/emotion.cpp
+    perception/vision_pipeline.cpp
+    intelligence/relation/affinity.cpp
+    intelligence/llm/gemma.cpp
+    intelligence/prompt/prompt.cpp
+    intelligence/persona/fallback_personality.cpp
+    intelligence/persona/persona_loader.cpp
+    app/app_event_bus.cpp
+    app/idle_monitor.cpp
+    app/mode_runner_camera.cpp
+    app/mode_runner_chat.cpp
+    app/mode_runner_full.cpp
+    app/mode_runner_ui.cpp
+    app/strategy_settings_service.cpp
+    brain/brain_controller.cpp
+    brain/conversation_orchestrator.cpp
+    brain/emotion_state.cpp
+    brain/event_router.cpp
+    brain/relation_state.cpp
+    brain/session.cpp
+    intelligence/memory/memory_db.cpp
+    app/application.cpp
+    app/module_registry.cpp
+    ui/ui_app.cpp
+    ui/common/ui_style.cpp
+    ui/common/ui_widgets.cpp
+    ui/managers/ui_manager.cpp
+    ui/managers/ui_screen_lifecycle.cpp
+    ui/controller/ui_navigation.cpp
+    ui/controller/ui_controller.cpp
+    ui/overlay/ui_pet_layer.cpp
+    ui/overlay/ui_status_bar.cpp
+    ui/overlay/ui_notification.cpp
+    ui/screens/home/ui_scr_home.cpp
+    ui/screens/menu/ui_scr_menu.cpp
+    ui/screens/persona/ui_persona.cpp
+    ui/screens/memory/ui_memory.cpp
+    ui/screens/tools/ui_tools.cpp
+    ui/screens/settings/ui_settings.cpp
+    ui/screens/interaction/strategy_overview_panel.cpp
+    ui/screens/interaction/strategy_controls_panel.cpp
+    ui/screens/interaction/strategy_file_panel.cpp
+    ui/screens/interaction/ui_interaction.cpp
     ui/ui.cpp
 )
 
