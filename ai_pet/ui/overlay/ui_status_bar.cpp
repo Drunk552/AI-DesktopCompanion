@@ -7,11 +7,8 @@
 
 namespace {
 
-lv_obj_t* g_owner_root = nullptr;
 lv_obj_t* g_pet_root = nullptr;
 lv_obj_t* g_persona_root = nullptr;
-lv_obj_t* g_owner_emotion = nullptr;
-lv_obj_t* g_owner_affection = nullptr;
 lv_obj_t* g_pet_emotion = nullptr;
 lv_obj_t* g_pet_affection = nullptr;
 lv_obj_t* g_pet_relationship = nullptr;
@@ -43,34 +40,19 @@ void create() {
     lv_obj_t* left_panel = manager->getLeftPanel();
     lv_obj_t* right_host = manager->getStatusHost();
 
-    g_owner_root = lv_obj_create(left_panel);
-    lv_obj_set_size(g_owner_root, lv_pct(100), LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(g_owner_root, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(g_owner_root, 0, 0);
-    lv_obj_set_style_pad_left(g_owner_root, 10, 0);
-    lv_obj_set_style_pad_right(g_owner_root, 10, 0);
-    lv_obj_set_style_pad_top(g_owner_root, 8, 0);
-    lv_obj_set_style_pad_bottom(g_owner_root, 0, 0);
-    lv_obj_set_style_pad_column(g_owner_root, 6, 0);
-    lv_obj_set_flex_flow(g_owner_root, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_flex_align(g_owner_root, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_align(g_owner_root, LV_ALIGN_TOP_MID, 0, 4);
-    lv_obj_add_flag(g_owner_root, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    lv_obj_clear_flag(g_owner_root, LV_OBJ_FLAG_SCROLLABLE);
-
     g_pet_root = lv_obj_create(left_panel);
     lv_obj_set_size(g_pet_root, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(g_pet_root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(g_pet_root, 0, 0);
-    lv_obj_set_style_pad_left(g_pet_root, 10, 0);
-    lv_obj_set_style_pad_right(g_pet_root, 10, 0);
+    lv_obj_set_style_pad_left(g_pet_root, 14, 0);
+    lv_obj_set_style_pad_right(g_pet_root, 14, 0);
     lv_obj_set_style_pad_top(g_pet_root, 0, 0);
-    lv_obj_set_style_pad_bottom(g_pet_root, 8, 0);
+    lv_obj_set_style_pad_bottom(g_pet_root, 12, 0);
     lv_obj_set_style_pad_column(g_pet_root, 6, 0);
     lv_obj_set_style_pad_row(g_pet_root, 6, 0);
     lv_obj_set_flex_flow(g_pet_root, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_flex_align(g_pet_root, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_align(g_pet_root, LV_ALIGN_BOTTOM_MID, 0, -8);
+    lv_obj_align(g_pet_root, LV_ALIGN_BOTTOM_MID, 0, -10);
     lv_obj_add_flag(g_pet_root, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_clear_flag(g_pet_root, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -83,8 +65,8 @@ void create() {
     lv_obj_set_style_border_side(g_persona_root, LV_BORDER_SIDE_BOTTOM, 0);
     lv_obj_set_style_pad_left(g_persona_root, 12, 0);
     lv_obj_set_style_pad_right(g_persona_root, 12, 0);
-    lv_obj_set_style_pad_top(g_persona_root, 6, 0);
-    lv_obj_set_style_pad_bottom(g_persona_root, 6, 0);
+    lv_obj_set_style_pad_top(g_persona_root, 3, 0);
+    lv_obj_set_style_pad_bottom(g_persona_root, 3, 0);
     lv_obj_set_style_radius(g_persona_root, 0, 0);
     lv_obj_clear_flag(g_persona_root, LV_OBJ_FLAG_SCROLLABLE);
     manager->registerScreen(
@@ -93,11 +75,9 @@ void create() {
         pet_ui::manager::UiScreenLifecycleManager::ScreenCategory::OverlayLayer
     );
 
-    g_owner_emotion = pet_ui::widgets::create_status_chip(g_owner_root, "开心", lv_color_hex(0x6B7280), font);
-    g_owner_affection = pet_ui::widgets::create_status_chip(g_owner_root, "好感 48", lv_color_hex(0x8B5E7A), font);
-    g_pet_emotion = pet_ui::widgets::create_status_chip(g_pet_root, "开心", lv_color_hex(0x86EFAC), font);
-    g_pet_affection = pet_ui::widgets::create_status_chip(g_pet_root, "好感 39", lv_color_hex(0xFDE68A), font);
-    g_pet_relationship = pet_ui::widgets::create_status_chip(g_pet_root, "熟悉", lv_color_hex(0x94A3B8), font);
+    g_pet_emotion = pet_ui::widgets::create_status_chip(g_pet_root, "开心", lv_color_hex(0x8FE3B0), font);
+    g_pet_affection = pet_ui::widgets::create_status_chip(g_pet_root, "亲密度 48", lv_color_hex(0xF5D77A), font);
+    g_pet_relationship = pet_ui::widgets::create_status_chip(g_pet_root, "来密", lv_color_hex(0xA5B6D3), font);
 
     g_persona_name = lv_label_create(g_persona_root);
     lv_label_set_text(g_persona_name, "紫金公主");
@@ -173,7 +153,7 @@ void update_emotion(const std::string& emotion) {
 }
 
 void update_affection(const std::string& affection) {
-    set_label(g_pet_affection, "好感 " + affection);
+    set_label(g_pet_affection, "亲密度 " + affection);
 }
 
 void update_relationship(const std::string& relationship) {
@@ -181,7 +161,7 @@ void update_relationship(const std::string& relationship) {
 }
 
 void update_strategy(const std::string& strategy) {
-    set_label(g_owner_emotion, strategy.empty() ? "主人状态" : strategy);
+    LV_UNUSED(strategy);
 }
 
 void apply_brain_state(const brain::BrainState& state) {
@@ -189,7 +169,6 @@ void apply_brain_state(const brain::BrainState& state) {
     update_emotion(state.emotion);
     update_affection(std::to_string(state.affinity));
     update_relationship(state.relationship);
-    update_strategy(state.activeMode + " / " + state.personaStyle + (state.quietHourActive ? " / 夜间" : ""));
 }
 
 }  // namespace pet_ui::overlay::status_bar

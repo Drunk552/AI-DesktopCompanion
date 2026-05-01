@@ -2,6 +2,14 @@
 
 namespace pet_ui::manager {
 
+namespace {
+
+constexpr int kLeftPanelRatioNumerator = 2;
+constexpr int kLeftPanelRatioDenominator = 5;
+constexpr int kStatusHostHeight = 36;
+
+}
+
 UiManager* UiManager::getInstance() {
     static UiManager instance;
     return &instance;
@@ -31,14 +39,14 @@ void UiManager::init(int width, int height, lv_group_t* keypadGroup, lv_font_t* 
     lv_obj_clear_flag(rootRow_, LV_OBJ_FLAG_SCROLLABLE);
 
     leftPanel_ = lv_obj_create(rootRow_);
-    lv_obj_set_size(leftPanel_, width_ * 2 / 5, height_);
+    lv_obj_set_size(leftPanel_, width_ * kLeftPanelRatioNumerator / kLeftPanelRatioDenominator, height_);
     lv_obj_set_style_border_width(leftPanel_, 0, 0);
     lv_obj_set_style_pad_all(leftPanel_, 0, 0);
     lv_obj_set_style_radius(leftPanel_, 0, 0);
     lv_obj_clear_flag(leftPanel_, LV_OBJ_FLAG_SCROLLABLE);
 
     rightPanel_ = lv_obj_create(rootRow_);
-    lv_obj_set_size(rightPanel_, width_ - (width_ * 2 / 5), height_);
+    lv_obj_set_size(rightPanel_, width_ - (width_ * kLeftPanelRatioNumerator / kLeftPanelRatioDenominator), height_);
     lv_obj_set_style_border_width(rightPanel_, 0, 0);
     lv_obj_set_style_pad_all(rightPanel_, 0, 0);
     lv_obj_set_style_pad_row(rightPanel_, 0, 0);
@@ -47,14 +55,14 @@ void UiManager::init(int width, int height, lv_group_t* keypadGroup, lv_font_t* 
     lv_obj_clear_flag(rightPanel_, LV_OBJ_FLAG_SCROLLABLE);
 
     statusHost_ = lv_obj_create(rightPanel_);
-    lv_obj_set_size(statusHost_, width_ - (width_ * 2 / 5), 48);
+    lv_obj_set_size(statusHost_, width_ - (width_ * kLeftPanelRatioNumerator / kLeftPanelRatioDenominator), kStatusHostHeight);
     lv_obj_set_style_bg_opa(statusHost_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(statusHost_, 0, 0);
     lv_obj_set_style_pad_all(statusHost_, 0, 0);
     lv_obj_clear_flag(statusHost_, LV_OBJ_FLAG_SCROLLABLE);
 
     contentHost_ = lv_obj_create(rightPanel_);
-    lv_obj_set_width(contentHost_, width_ - (width_ * 2 / 5));
+    lv_obj_set_width(contentHost_, width_ - (width_ * kLeftPanelRatioNumerator / kLeftPanelRatioDenominator));
     lv_obj_set_flex_grow(contentHost_, 1);
     lv_obj_set_style_bg_opa(contentHost_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(contentHost_, 0, 0);
@@ -68,12 +76,36 @@ void UiManager::registerScreen(ScreenType type, lv_obj_t** screenPtrRef, UiScree
     UiScreenLifecycleManager::getInstance()->registerScreen(type, category, screenPtrRef);
 }
 
-void UiManager::loadContentScreen(ScreenType, lv_obj_t* screen) {
+void UiManager::loadContentScreen(ScreenType type, lv_obj_t* screen) {
     if (!screen) {
         return;
     }
+    applyLayoutForScreen(type);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_HIDDEN);
     destroyAllScreensExcept(screen);
+}
+
+void UiManager::applyLayoutForScreen(ScreenType type) {
+    const int leftWidth = width_ * kLeftPanelRatioNumerator / kLeftPanelRatioDenominator;
+    const int rightWidth = width_ - leftWidth;
+    const bool menuMode = (type == ScreenType::Menu);
+
+    if (menuMode) {
+        lv_obj_add_flag(leftPanel_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(statusHost_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_size(rightPanel_, width_, height_);
+        lv_obj_set_size(statusHost_, width_, 0);
+        lv_obj_set_width(contentHost_, width_);
+    } else {
+        lv_obj_clear_flag(leftPanel_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(statusHost_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_size(leftPanel_, leftWidth, height_);
+        lv_obj_set_size(rightPanel_, rightWidth, height_);
+        lv_obj_set_size(statusHost_, rightWidth, kStatusHostHeight);
+        lv_obj_set_width(contentHost_, rightWidth);
+    }
+
+    lv_obj_update_layout(rootRow_);
 }
 
 void UiManager::destroyAllScreensExcept(lv_obj_t* keep) {

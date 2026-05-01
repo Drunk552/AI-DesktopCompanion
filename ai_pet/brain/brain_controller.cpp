@@ -205,8 +205,6 @@ void BrainController::handlePerceptionEmotion(const std::string& emotion) {
     if (eventBus_) {
         eventBus_->emit(events::kBrainEmotionChanged, emotion);
         actionCoordinator_.pet().updateEmotion(emotion);
-        const BrainState state = currentState();
-        triggerProactiveBehavior(state);
         emitStateChanged();
     }
 }

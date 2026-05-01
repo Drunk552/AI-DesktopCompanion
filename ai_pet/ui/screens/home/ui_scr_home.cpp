@@ -8,8 +8,10 @@
 
 #include <SDL2/SDL.h>
 #include <algorithm>
+#include <ctime>
 #include <cstdlib>
 #include <mutex>
+#include <cstdio>
 #include <string_view>
 #include <vector>
 
@@ -74,6 +76,28 @@ bool g_pending_thinking_updated = false;
 void draw_rect(lv_layer_t& layer, const lv_area_t& area, lv_color_t color, lv_opa_t opa, int32_t radius = 0);
 void draw_text(lv_layer_t& layer, const lv_area_t& area, const char* text, lv_color_t color, const lv_font_t* font,
                lv_text_align_t align = LV_TEXT_ALIGN_LEFT);
+
+std::string current_timestamp_label() {
+    std::time_t now = std::time(nullptr);
+    std::tm local_tm{};
+#if defined(_WIN32)
+    localtime_s(&local_tm, &now);
+#else
+    localtime_r(&now, &local_tm);
+#endif
+
+    char buffer[32];
+    std::snprintf(
+        buffer,
+        sizeof(buffer),
+        "%d月%d日 %02d:%02d",
+        local_tm.tm_mon + 1,
+        local_tm.tm_mday,
+        local_tm.tm_hour,
+        local_tm.tm_min
+    );
+    return buffer;
+}
 
 void destroy_message_cache(ChatMessage& message) {
     if (message.cacheBuf) {
@@ -328,7 +352,8 @@ void redraw_chat_canvas() {
     const int32_t ts_y = -g_scroll_offset;
     if (ts_y + kTimestampHeight >= 0 && ts_y <= height) {
         lv_area_t ts_area{0, ts_y, width - 1, ts_y + kTimestampHeight - 1};
-        draw_text(layer, ts_area, "2月26日 11:06", lv_color_hex(0x6B7280), font, LV_TEXT_ALIGN_CENTER);
+        const std::string timestamp = current_timestamp_label();
+        draw_text(layer, ts_area, timestamp.c_str(), lv_color_hex(0x6B7280), font, LV_TEXT_ALIGN_CENTER);
     }
 
     for (const auto& message : g_messages) {

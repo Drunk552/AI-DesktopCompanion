@@ -45,16 +45,26 @@ SessionTurnResult ConversationOrchestrator::handleTurn(const std::string& input,
         promptContext.affinity = relation.affinity;
         promptContext.emotionTrend = memory_.getEmotionTrend();
         promptContext.persona = getPersonaPtr();
-        const std::string prompt = buildPrompt(promptContext);
-
-        auto future = ai_.chatAsync(prompt);
         std::string reply;
 
-        if (waitForAI(future, reply, timeoutMs)) {
-            if (reply.empty()) {
-                reply = "……";
-            }
+        bool completed = false;
+        {
+            const std::string prompt = buildPrompt(promptContext);
+            auto future = ai_.chatAsync(prompt);
+            completed = waitForAI(future, reply, timeoutMs);
+        }
 
+        if ((!completed || reply.empty()) && !cancelled_.load()) {
+            LOGW("ConversationOrchestrator", "首轮 AI 调用失败，正在使用精简上下文重试一次");
+            reply.clear();
+            promptContext.context.clear();
+            promptContext.emotionTrend.clear();
+            const std::string retryPrompt = buildPrompt(promptContext);
+            auto retryFuture = ai_.chatAsync(retryPrompt);
+            completed = waitForAI(retryFuture, reply, timeoutMs);
+        }
+
+        if (completed && !reply.empty()) {
             memory_.saveChat(input, reply, result.emotion);
             memory_.recordEmotion(result.emotion);
             memory_.incrementChatCount();

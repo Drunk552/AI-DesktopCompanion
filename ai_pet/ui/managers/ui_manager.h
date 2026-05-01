@@ -30,6 +30,7 @@ public:
 
 private:
     UiManager() = default;
+    void applyLayoutForScreen(ScreenType type);
 
     int width_ = 480;
     int height_ = 320;

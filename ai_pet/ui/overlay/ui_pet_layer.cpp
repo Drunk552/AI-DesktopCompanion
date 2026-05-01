@@ -78,7 +78,6 @@ namespace pet_ui::overlay::pet_layer {
 void create() {
     auto* manager = pet_ui::manager::UiManager::getInstance();
     lv_obj_t* parent = manager->getLeftPanel();
-    lv_font_t* bodyFont = manager->getBodyFont();
 
     g_root = lv_obj_create(parent);
     lv_obj_set_size(g_root, lv_pct(100), lv_pct(100));
@@ -99,36 +98,23 @@ void create() {
     lv_obj_add_flag(bg, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_move_to_index(bg, 0);
 
-    lv_obj_t* title = lv_label_create(g_root);
-    lv_label_set_text(title, "陪伴体");
-    lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), 0);
-    if (bodyFont) {
-        lv_obj_set_style_text_font(title, bodyFont, 0);
-    }
-    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 16, 96);
-
     g_pet_image = lv_animimg_create(g_root);
     set_pet_anim(kIdleFrames, 4, 900);
-    lv_obj_align(g_pet_image, LV_ALIGN_CENTER, 0, 12);
-
-    lv_obj_t* hint = lv_label_create(g_root);
-    lv_label_set_text(hint, "会随着情绪切换表情");
-    lv_obj_set_style_text_color(hint, lv_color_hex(0xE5E7EB), 0);
-    if (bodyFont) {
-        lv_obj_set_style_text_font(hint, bodyFont, 0);
-    }
-    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -56);
+    lv_obj_align(g_pet_image, LV_ALIGN_CENTER, 0, 20);
 
     g_camera_buffer.resize(kCamW * kCamH * 4, 0);
     g_camera_canvas = lv_canvas_create(g_root);
     lv_canvas_set_buffer(g_camera_canvas, g_camera_buffer.data(), kCamW, kCamH, LV_COLOR_FORMAT_ARGB8888);
     lv_obj_set_style_bg_color(g_camera_canvas, lv_color_hex(0x111827), 0);
     lv_obj_set_style_bg_opa(g_camera_canvas, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(g_camera_canvas, 12, 0);
+    lv_obj_set_style_radius(g_camera_canvas, 10, 0);
     lv_obj_set_style_clip_corner(g_camera_canvas, true, 0);
-    lv_obj_set_style_border_width(g_camera_canvas, 2, 0);
-    lv_obj_set_style_border_color(g_camera_canvas, lv_color_hex(0xF9E2AF), 0);
-    lv_obj_align(g_camera_canvas, LV_ALIGN_TOP_RIGHT, -10, 44);
+    lv_obj_set_style_border_width(g_camera_canvas, 1, 0);
+    lv_obj_set_style_border_color(g_camera_canvas, lv_color_hex(0xE9D8A6), 0);
+    lv_obj_set_style_shadow_width(g_camera_canvas, 12, 0);
+    lv_obj_set_style_shadow_opa(g_camera_canvas, LV_OPA_20, 0);
+    lv_obj_set_style_shadow_color(g_camera_canvas, lv_color_hex(0x8B6F47), 0);
+    lv_obj_align(g_camera_canvas, LV_ALIGN_TOP_MID, 0, 42);
     lv_obj_move_foreground(g_camera_canvas);
 }
 

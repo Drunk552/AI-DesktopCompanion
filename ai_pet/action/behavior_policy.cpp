@@ -289,13 +289,13 @@ DisturbanceLevel BehaviorPolicy::disturbanceLevel(const brain::BrainState& state
 int BehaviorPolicy::proactiveCooldownSeconds(DisturbanceLevel level) const {
     switch (level) {
         case DisturbanceLevel::Quiet:
-            return 180;
+            return 600;
         case DisturbanceLevel::Normal:
-            return 90;
+            return 300;
         case DisturbanceLevel::Clingy:
-            return 60;
+            return 300;
     }
-    return 90;
+    return 300;
 }
 
 std::string BehaviorPolicy::limitReplySentences(const std::string& text, size_t maxSentences) const {
@@ -530,20 +530,20 @@ bool BehaviorPolicy::hasRecentInteractionBurst() const {
 bool BehaviorPolicy::isIdleLongEnough(DisturbanceLevel level) const {
     const auto& state = strategyStateService_.state();
     if (state.lastUserInteractionAt.time_since_epoch().count() == 0) {
-        return true;
+        return false;
     }
 
     const auto now = std::chrono::steady_clock::now();
     const auto idleSeconds = std::chrono::duration_cast<std::chrono::seconds>(now - state.lastUserInteractionAt).count();
     switch (level) {
         case DisturbanceLevel::Quiet:
-            return idleSeconds >= 90;
+            return idleSeconds >= 600;
         case DisturbanceLevel::Normal:
-            return idleSeconds >= 45;
+            return idleSeconds >= 300;
         case DisturbanceLevel::Clingy:
-            return idleSeconds >= 20;
+            return idleSeconds >= 300;
     }
-    return idleSeconds >= 45;
+    return idleSeconds >= 300;
 }
 
 }  // namespace action

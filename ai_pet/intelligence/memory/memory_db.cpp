@@ -1,11 +1,44 @@
 #include "intelligence/memory/memory_db.h"
 #include "shared/logger/logger.h"
 #include <algorithm>
+#include <sstream>
 #include <sys/stat.h>
 
 static std::string safeColumnText(sqlite3_stmt* stmt, int col) {
     const char* p = reinterpret_cast<const char*>(sqlite3_column_text(stmt, col));
     return p ? p : "";
+}
+
+static std::string compact_for_context(const std::string& text, size_t maxLen = 160) {
+    std::string compact;
+    compact.reserve(std::min(text.size(), maxLen));
+
+    bool lastWasSpace = false;
+    for (char ch : text) {
+        const bool isSpace = ch == '\n' || ch == '\r' || ch == '\t' || ch == ' ';
+        if (isSpace) {
+            if (!lastWasSpace) {
+                compact.push_back(' ');
+            }
+            lastWasSpace = true;
+        } else {
+            compact.push_back(ch);
+            lastWasSpace = false;
+        }
+
+        if (compact.size() >= maxLen) {
+            break;
+        }
+    }
+
+    while (!compact.empty() && compact.back() == ' ') {
+        compact.pop_back();
+    }
+
+    if (text.size() > compact.size()) {
+        compact += "...";
+    }
+    return compact;
 }
 
 MemoryDB::MemoryDB(const std::string& dbPath)
@@ -190,7 +223,7 @@ std::string MemoryDB::getContext(int n) {
     std::string context = "以下是之前的对话记录：\n";
     for (const auto& rec : records) {
         context += "用户（" + rec.emotion + "）：" + rec.userText + "\n";
-        context += "你：" + rec.aiReply + "\n";
+        context += "你：" + compact_for_context(rec.aiReply) + "\n";
     }
     return context;
 }
